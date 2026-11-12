@@ -36,18 +36,25 @@ public sealed class Content : ComponentBase
         b.CloseElement();
     }
 
-    void Render(RenderTreeBuilder b, VNode node)
+    // `sizes` of a content picture: half a page beside text; the chapter's text column when it stands straight in a
+    // chapter, where site.css shows it wide.
+    const string ContentSizes = "(min-width: 760px) 50vw, 100vw";
+    const string ChapterSizes = "(min-width: 1280px) 1024px, (min-width: 760px) 78vw, 100vw";
+
+    void Render(RenderTreeBuilder b, VNode node, string sizes = ContentSizes)
     {
         switch (node.Type)
         {
             case "group":
                 Open(b, node);
-                foreach (var child in node.Children ?? []) Render(b, child);
+                // A chapter hands its own `sizes` to its children, and the picture's figure on to the picture; any other group starts again.
+                var childSizes = node.Class switch { "merchChapter" => ChapterSizes, "imageWithCaption" => sizes, _ => ContentSizes };
+                foreach (var child in node.Children ?? []) Render(b, child, childSizes);
                 b.CloseElement();
                 break;
             case "image":
                 if (node.ObjectId is { } imageId && Ctx.Images.GetValueOrDefault(imageId) is { } src)
-                    Image(b, node.Class, src, "(min-width: 760px) 50vw, 100vw");
+                    Image(b, node.Class, src, sizes);
                 break;
             case "object":
                 // Like the CMS, which wraps what an object component renders in the component's own element: the
