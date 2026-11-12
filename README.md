@@ -48,6 +48,7 @@ the Shopify variables.
 | `Components/Pages/RegionPage.cs` | base of every page: region, texts, page tree, the posted form fields |
 | `Components/Layout/Shell.razor` | document, header, region switch, footer; every page wraps itself in it |
 | `Components/Content.cs` | Visual Document renderer and page teaser, in C# (`BuildRenderTree`): the CMS names each element |
+| `Components/ContentContext.cs` | what a document refers to (embedded objects, links, pictures) by ID, the rewriting of its CMS links to site URLs, and what teasers and cards render with |
 | `Components/RangeSection.razor`, `Facet.razor` | the live range with its facets |
 | `Components/ProductCard.razor`, `Crumbs.razor` | product card; breadcrumb |
 | `wwwroot/` | `site.css`, `site.js`, fonts, icons, `robots.txt`: the same files in every demo; `MapStaticAssets` serves CSS and JS under a fingerprinted name |

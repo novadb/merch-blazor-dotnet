@@ -123,10 +123,9 @@
         }
         await LoadRegionAsync(region);
         var path = (Path ?? "").Trim('/');
-        var otherSite = Tree.LoadAsync(region.OtherLanguage);
         var groups = await Tree.LoadGroupsAsync(region);
-        var found = Site!.ByPath.TryGetValue(path, out var page)
-            ? await LoadPageAsync(page, await otherSite, groups)
+        var found = Map!.ByPath.TryGetValue(path, out var page)
+            ? await LoadPageAsync(page, groups)
             : await LoadProductAsync(path, groups);
         if (!found)
         {
@@ -136,23 +135,24 @@
         seo = Seo.Of(HttpContext.Request, Config, product?.Url ?? page!.Url, Alternates);
     }
 
-    async Task<bool> LoadPageAsync(SitePage page, SiteMap otherSite, Dictionary<int, string> groups)
+    async Task<bool> LoadPageAsync(SitePage page, Dictionary<int, string> groups)
     {
-        var embeddedIds = ContentContext.ReferencedIds(page.Content).Where(id => !Site!.Pages.ContainsKey(id)).ToList();
+        var otherMap = Tree.LoadAsync(Region.OtherLanguage); // the page's path in the other language is its hreflang link
+        var embeddedIds = ContentContext.ReferencedIds(page.Content).Where(id => !Map!.Pages.ContainsKey(id)).ToList();
         var wantedImages = ContentContext.ImageIds(page.Content); // plus the teaser picture of every page
-        foreach (var p in Site!.Pages.Values) if (p.ImageId is { } id) wantedImages.Add(id);
+        foreach (var p in Map!.Pages.Values) if (p.ImageId is { } id) wantedImages.Add(id);
         var embedded = Catalog.ByIdsAsync(embeddedIds, Region);
         var products = page.GroupRefs.Length > 0 ? Catalog.LoadAsync(Region, $"{Schema.Product.Group} = {string.Join(", ", page.GroupRefs)}") : Task.FromResult<List<Product>>([]);
         var pictures = await Pictures.ByIdsAsync(wantedImages);
 
-        var targets = Site.Pages.Values.ToDictionary(p => p.Id, p => new Target(p.Url, p.Title, p.ImageId is { } id ? pictures.GetValueOrDefault(id) : null));
-        foreach (var p in await embedded) targets[p.Id] = new Target(p.Url, p.Name, p.Image);
+        var targets = Map.Pages.Values.ToDictionary(p => p.Id, p => new Target(p.Url, p.Title, p.ImageId is { } id ? pictures.GetValueOrDefault(id) : null));
+        var embeddedProducts = await embedded;
+        foreach (var p in embeddedProducts) targets[p.Id] = new Target(p.Url, p.Name, p.Image);
         title = page.Title;
-        Alternates = Region.Alternates(page.Path, otherSite.Pages.GetValueOrDefault(page.Id)?.Path);
-        crumbs = [.. Site.Breadcrumb(page).Select(ToCrumb)];
+        Alternates = Region.Alternates(page.Path, (await otherMap).Pages.GetValueOrDefault(page.Id)?.Path);
+        crumbs = [.. Map.Breadcrumb(page).Select(ToCrumb)];
         document = page.Content;
-        ctx = new ContentContext(Region, Text!, (await embedded).ToDictionary(p => p.Id), targets,
-            ContentContext.ImageIds(page.Content).Where(pictures.ContainsKey).ToDictionary(id => id, id => pictures[id]));
+        ctx = new ContentContext(Region, Text!, embeddedProducts.ToDictionary(p => p.Id), targets, pictures);
         if (await products is { Count: > 0 } all) range = Catalog.ApplySelection(all, Catalog.ParseSelection(Form), "name");
         groupNames = groups;
         return true;
@@ -162,11 +162,12 @@
     {
         if (path.Length == 0 || await Catalog.ByPathAsync(Region, path) is not { } found) return false;
         var similarTask = Catalog.ByIdsAsync(found.Similar, Region);
+        // The same product in the other language: its path is the hreflang link.
         var other = (await Catalog.ByIdsAsync([found.Id], Region.OtherLanguage)).FirstOrDefault();
-        var category = found.GroupId is { } group ? Site!.CategoryPage(group) : null;
+        var category = found.GroupId is { } group ? Map!.CategoryPage(group) : null;
         title = found.Name;
         Alternates = Region.Alternates(found.Path, other?.Path);
-        crumbs = [.. Site!.Breadcrumb(category).Select(ToCrumb), new Target(found.Url, found.Name, null)];
+        crumbs = [.. Map!.Breadcrumb(category).Select(ToCrumb), new Target(found.Url, found.Name, null)];
         ctx = new ContentContext(Region, Text!);
         product = found;
         similar = await similarTask;

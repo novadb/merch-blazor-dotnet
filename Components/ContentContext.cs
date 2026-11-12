@@ -4,13 +4,14 @@ using Merch.Site;
 
 namespace Merch.Components;
 
-/// <summary>Everything a link or teaser in content can point at: pages and products, by object ID.</summary>
+/// <summary>A page or product a link or teaser in content can point at.</summary>
+/// <param name="Image">Picture URL (<c>/media/{md5}{ext}</c>) for a teaser; null: none.</param>
 public sealed record Target(string Url, string Title, string? Image);
 
 /// <summary>
 /// What the components render with. <c>Products</c>: the products a document embeds; <c>Targets</c>: every page and
 /// product a link or teaser can point at; <c>Images</c>: the picture URL (<c>/media/{md5}{ext}</c>) of each image object
-/// the document embeds. All by object ID.
+/// a document node can name. All by object ID.
 /// </summary>
 public sealed partial record ContentContext(Region Region, Texts Text, IReadOnlyDictionary<int, Product> Products, IReadOnlyDictionary<int, Target> Targets, IReadOnlyDictionary<int, string> Images)
 {

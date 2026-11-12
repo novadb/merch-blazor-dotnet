@@ -41,6 +41,8 @@ public sealed class Content : ComponentBase
     const string ContentSizes = "(min-width: 760px) 50vw, 100vw";
     const string ChapterSizes = "(min-width: 1280px) 1024px, (min-width: 760px) 78vw, 100vw";
 
+    // A node is rendered by its type, element and class; the classes (`merch*`) are a closed set that the CMS defines, so
+    // no code here knows them one by one. The node's `definition` is not read: the class names the component.
     void Render(RenderTreeBuilder b, VNode node, string sizes = ContentSizes)
     {
         switch (node.Type)

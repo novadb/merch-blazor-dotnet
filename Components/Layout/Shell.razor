@@ -18,7 +18,7 @@
 </head>
 <body data-lang="@Page.Region.Code" data-shop="@(string.IsNullOrEmpty(ShopDomain) || string.IsNullOrEmpty(ShopToken) ? null : "")" data-text="@(Page.Text is null ? null : System.Text.Json.JsonSerializer.Serialize(Page.Text.ForClient()))">
     <a class="skip" href="#main">@(Page.Text?["skip"] ?? "Skip to content")</a>
-    @if (Page.Text is { } text && Page.Site is { } site)
+    @if (Page.Text is { } text && Page.Map is { } site)
     {
         <header class="site-header">
             <div class="site-header__inner">
@@ -77,7 +77,7 @@
 </html>
 
 @code {
-    /// <summary>This demo's repository on GitHub (github.com/novadb/…), linked from the corner of every page.</summary>
+    /// <summary>This demo's repository on GitHub (github.com/novadb/…), linked from the footer of every page.</summary>
     const string Repo = "merch-blazor-dotnet";
 
     [Parameter, EditorRequired] public RegionPage Page { get; set; } = null!;

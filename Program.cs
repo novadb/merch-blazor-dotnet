@@ -94,16 +94,17 @@ app.MapGet("/media/{width}/{name}", (string width, string name, HttpContext cont
 // POST /api/suggest with the form fields `lang` and `q` → { products: [...5], pages: [...3] } for the header's typeahead.
 app.MapPost("/api/suggest", async (HttpRequest request, Catalog catalog, SiteTree tree) =>
 {
+    if (!request.HasFormContentType) return Results.BadRequest();
     var form = await request.ReadFormAsync();
     if (Region.Find(form["lang"]) is not { } region) return Results.NotFound();
     var q = form["q"].ToString().Trim();
     if (q.Length < 2 || Catalog.SearchFilter(q, Schema.ProductSearchFields) is not { } filter) return Results.Json(new { products = Array.Empty<object>(), pages = Array.Empty<object>() });
 
-    var products = catalog.LoadAsync(region, filter, "$score");
+    var products = catalog.LoadAsync(region, filter, "$score", take: 5);
     var pages = tree.SearchAsync(region, q, 3);
     return Results.Json(new
     {
-        products = (await products).Take(5).Select(p => new { name = p.Name, url = p.Url, image = p.Image is null ? null : Images.SmallSrc(p.Image), price = region.FormatPrice(p.Price) }),
+        products = (await products).Select(p => new { name = p.Name, url = p.Url, image = p.Image is null ? null : Images.SmallSrc(p.Image), price = region.FormatPrice(p.Price) }),
         pages = (await pages).Select(p => new { title = p.Title, url = p.Url }),
     });
 });
