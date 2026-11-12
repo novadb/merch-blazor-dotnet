@@ -1,0 +1,80 @@
+@* A live product range: facet filters as a plain POST form (the URL stays the page's), sorting and the product grid. *@
+@{
+    var (items, facets, selection, defaultSort) = Range;
+    var text = Ctx.Text;
+    var sortLabel = new Dictionary<string, string>
+    {
+        ["relevance"] = text["sortRelevance"], ["name"] = text["sortName"], ["price-asc"] = text["sortPriceAsc"], ["price-desc"] = text["sortPriceDesc"],
+    };
+    // "relevance" is offered only where it is the default: a search with usable terms.
+    var sorts = Catalog.Sorts.Where(s => s != "relevance" || defaultSort == "relevance");
+    var currentSort = selection.Sort ?? defaultSort;
+}
+<section class="range" id="range" aria-label='@text["filter"]'>
+    <form class="facets" id="facets" method="post" action="#range" data-autosubmit="true">
+        @if (Query is { Length: > 0 })
+        {
+            <input type="hidden" name="q" value="@Query" />
+        }
+        @if (facets.Group.Count > 1)
+        {
+            <Facet Legend='@text["group"]' Name="group" Values="@([.. facets.Group.Where(v => GroupNames.ContainsKey(int.Parse(v.Value)))])" LabelOf="v => GroupNames[int.Parse(v)]" />
+        }
+        <Facet Legend='@text["colour"]' Name="color" Values="facets.Color" LabelOf="v => text.Value(int.Parse(v))" SwatchOf="v => text.Swatch(int.Parse(v))" />
+        <Facet Legend='@text["material"]' Name="material" Values="facets.Material" LabelOf="v => text.Value(int.Parse(v))" />
+        <fieldset class="facet">
+            <legend>@text["availability"]</legend>
+            <label class="facet__option"><input type="checkbox" name="stock" value="1" checked="@selection.Stock" /><span>@text["inStock"]</span><span class="facet__count">@facets.InStock</span></label>
+        </fieldset>
+        <fieldset class="facet facet--price">
+            <legend>@text["price"]</legend>
+            <label><span>@text["from"]</span><input type="number" name="min" inputmode="numeric" min="0" placeholder="@facets.PriceMin" value="@selection.Min" /></label>
+            <label><span>@text["to"]</span><input type="number" name="max" inputmode="numeric" min="0" placeholder="@facets.PriceMax" value="@selection.Max" /></label>
+        </fieldset>
+        <div class="facets__actions">
+            <button type="submit" class="button">@text["apply"]</button>
+            <button type="submit" name="reset" value="1" class="button button--ghost">@text["reset"]</button>
+        </div>
+    </form>
+    <div class="range__main">
+        <div class="range__bar">
+            <p class="range__count" aria-live="polite">@text.Results(items.Count)</p>
+            <label class="range__sort">
+                <span>@text["sort"]</span>
+                <select name="sort" form="facets">
+                    @foreach (var s in sorts)
+                    {
+                        <option value="@s" selected="@(s == currentSort)">@sortLabel[s]</option>
+                    }
+                </select>
+            </label>
+        </div>
+        @if (items.Count > 0)
+        {
+            <div class="grid">
+                @foreach (var p in items.Take(selection.Shown))
+                {
+                    <ProductCard Product="p" Ctx="Ctx" />
+                }
+            </div>
+        }
+        else
+        {
+            <p class="range__empty">@text["noResults"]</p>
+        }
+        @* Posts the filters again with one batch more; with JS site.js fetches it while scrolling and appends the new cards. *@
+        @if (items.Count > selection.Shown)
+        {
+            <button type="submit" form="facets" name="shown" value="@(selection.Shown + Catalog.RangeBatch)" class="button button--ghost range__more">@text["showMore"]</button>
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public ProductRange Range { get; set; } = null!;
+    [Parameter, EditorRequired] public ContentContext Ctx { get; set; } = null!;
+    /// <summary>Group ID → name, for the group facet.</summary>
+    [Parameter, EditorRequired] public IReadOnlyDictionary<int, string> GroupNames { get; set; } = null!;
+    /// <summary>The search query on the search page: the range form posts it again.</summary>
+    [Parameter] public string? Query { get; set; }
+}

@@ -1,0 +1,52 @@
+@page "/error/{Code:int?}"
+@* The page for a 404 (re-executed by UseStatusCodePagesWithReExecute, also after NavigationManager.NotFound()) and an
+   error (UseExceptionHandler), in the region of the URL that failed, else `us`. *@
+@using Microsoft.AspNetCore.Diagnostics
+@inherits RegionPage
+@inject ILogger<Error> Logger
+
+@{
+    var text = Text;
+    var notFound = isNotFound && text is not null;
+}
+<Shell Page="this">
+    @if (text is not null)
+    {
+        <PageTitle>@text["siteName"]</PageTitle>
+    }
+    <section class="merchHero not-found">
+        <h1 class="merchDisplay">@(notFound ? text!["notFound"] : "Error")</h1>
+        @if (notFound)
+        {
+            <p class="merchLead">@text!.Html("notFoundText")</p>
+        }
+        else
+        {
+            <p class="merchLead">Something went wrong while loading this page.</p>
+        }
+        <p class="merchCta"><a href="@(Site?.Home.Url ?? "/")">@(text?["home"] ?? "Home")</a></p>
+    </section>
+</Shell>
+
+@code {
+    [Parameter] public int? Code { get; set; }
+
+    bool isNotFound;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var failedPath = HttpContext.Features.Get<IStatusCodeReExecuteFeature>()?.OriginalPath
+            ?? HttpContext.Features.Get<IExceptionHandlerPathFeature>()?.Path ?? "";
+        isNotFound = Code == StatusCodes.Status404NotFound;
+        HttpContext.Response.StatusCode = Code ?? StatusCodes.Status500InternalServerError;
+        try
+        {
+            await LoadRegionAsync(Region.Find(failedPath.Split('/', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()) ?? Region.Us);
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
+        {
+            // NovaDB cannot be reached: there are no labels, the page stands alone in English.
+            Logger.LogError(e, "The error page has no texts");
+        }
+    }
+}

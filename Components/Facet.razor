@@ -1,0 +1,21 @@
+@* One facet of a range: a checkbox per value. A value with no hit under the other filters stays listed (the list never changes), but cannot be chosen. *@
+@if (Values.Count > 0)
+{
+    <fieldset class="facet">
+        <legend>@Legend</legend>
+        @foreach (var v in Values)
+        {
+            <label class="facet__option"><input type="checkbox" name="@Name" value="@v.Value" checked="@v.Selected" disabled="@(v.Count == 0 && !v.Selected)" />@if (SwatchOf is not null) {<span class="swatch" style="--swatch:@SwatchOf(v.Value)" aria-hidden="true"></span>}<span>@LabelOf(v.Value)</span><span class="facet__count">@v.Count</span></label>
+        }
+    </fieldset>
+}
+
+@code {
+    [Parameter, EditorRequired] public string Legend { get; set; } = "";
+    /// <summary>The form field the checkboxes post.</summary>
+    [Parameter, EditorRequired] public string Name { get; set; } = "";
+    [Parameter, EditorRequired] public IReadOnlyList<FacetValue> Values { get; set; } = [];
+    [Parameter, EditorRequired] public Func<string, string> LabelOf { get; set; } = null!;
+    /// <summary>The colour of a value's swatch, for the colour facet.</summary>
+    [Parameter] public Func<string, string?>? SwatchOf { get; set; }
+}

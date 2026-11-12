@@ -1,0 +1,25 @@
+@* The breadcrumb of a page or product: the trail from the home page, the last item being the page itself. The home page has none. *@
+@if (Items.Count >= 2)
+{
+    <nav class="crumbs" aria-label="@Label">
+        <ol>
+            @for (var i = 0; i < Items.Count; i++)
+            {
+                var item = Items[i];
+                if (i == Items.Count - 1)
+                {
+                    <li><span aria-current="page">@item.Title</span></li>
+                }
+                else
+                {
+                    <li><a href="@item.Url">@item.Title</a></li>
+                }
+            }
+        </ol>
+    </nav>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<Target> Items { get; set; } = [];
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+}

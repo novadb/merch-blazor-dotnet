@@ -1,0 +1,6 @@
+@* The root component: the router, nothing else. The document (<html>, header, footer) is Layout/Shell.razor, which
+   every page wraps itself in. Every page is rendered once on the server (static SSR): no circuit, no WebAssembly, no
+   blazor.web.js; behaviour lives in site.js. *@
+<Router AppAssembly="typeof(App).Assembly">
+    <Found Context="route"><RouteView RouteData="route" /></Found>
+</Router>

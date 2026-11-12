@@ -1,0 +1,60 @@
+@page "/{RegionCode}/search"
+@* /{region}/search: full-text search over products (with facets) and pages; the query is the posted field `q`. A
+   posted search or range form renders this page again with its fields. *@
+@inherits RegionPage
+@inject Catalog Catalog
+
+@if (range is not null)
+{
+    var text = Text!;
+    <Shell Page="this">
+        @* No canonical or hreflang: internal search results are not meant to be indexed. *@
+        <PageTitle>@text["search"] · @text["siteName"]</PageTitle>
+        <section class="merchHero merchHero--compact">
+            <p class="merchKicker">@text["search"]</p>
+            <h1 class="merchDisplay">@text.SearchTitle(query)</h1>
+            <form class="search search--large" role="search" method="post" action="/@Region.Code/search">
+                <input type="search" name="q" value="@query" placeholder='@text["searchPlaceholder"]' aria-label='@text["search"]' autocomplete="off" data-suggest="/api/suggest" />
+                <button type="submit" class="button">@text["search"]</button>
+            </form>
+            @if (pages.Count > 0)
+            {
+                <nav class="search-pages" aria-label='@text["pagesFound"]'>
+                    <span>@text["pagesFound"]:</span>
+                    @foreach (var p in pages)
+                    {
+                        <a href="@p.Url">@p.Title</a>
+                    }
+                </nav>
+            }
+        </section>
+        <RangeSection Range="range" Ctx="new ContentContext(Region, text)" GroupNames="groupNames" Query="@query" />
+    </Shell>
+}
+
+@code {
+    [Parameter] public string RegionCode { get; set; } = "";
+
+    string query = "";
+    ProductRange? range;
+    List<SitePage> pages = [];
+    Dictionary<int, string> groupNames = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Region.Find(RegionCode) is not { } region)
+        {
+            Navigation.NotFound();
+            return;
+        }
+        await LoadRegionAsync(region);
+        query = Form["q"].ToString().Trim();
+        var filter = Catalog.SearchFilter(query, Schema.ProductSearchFields);
+        var products = Catalog.LoadAsync(region, filter, filter is null ? null : "$score");
+        var found = Tree.SearchAsync(region, query, 5);
+        groupNames = await Tree.LoadGroupsAsync(region);
+        range = Catalog.ApplySelection(await products, Catalog.ParseSelection(Form), filter is null ? "name" : "relevance");
+        pages = await found;
+        Alternates = Region.All.ToDictionary(r => r, r => $"/{r.Code}/search");
+    }
+}
