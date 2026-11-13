@@ -55,5 +55,5 @@ the Shopify variables.
 
 ## Deviations
 
-- Scaled pictures (`/media/{width}/…`) are made with SkiaSharp: their bytes differ slightly from other demos' (resampling at
+- Scaled pictures (`/media/{md5}/{width}{ext}.webp`) are made with SkiaSharp: their bytes differ slightly from other demos' (resampling at
   high-contrast edges), and an animated GIF or WebP is scaled to its first frame.
