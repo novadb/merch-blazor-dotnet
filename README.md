@@ -1,5 +1,14 @@
 # Nova Merchandising — ASP.NET Core Blazor, static server rendering
 
+**Live:** <https://blazor-dotnet.merch.novadb.com/>: this repository's `main`, running against NovaDB. `/` picks the
+region by browser language (`/de/`, `/uk/`, `/us/`); the checkout is in Shopify's test mode.
+
+The same shop in other stacks: React Router ([live](https://react-router.merch.novadb.com/),
+[source](https://github.com/novadb/merch-react-router)) · Razor Pages + htmx
+([live](https://razor-htmx.merch.novadb.com/), [source](https://github.com/novadb/merch-razor-htmx)) · Nuxt
+([live](https://vue-nuxt.merch.novadb.com/), [source](https://github.com/novadb/merch-vue-nuxt)) · Astro
+([live](https://astro.merch.novadb.com/), [source](https://github.com/novadb/merch-astro))
+
 The demo site of NovaDB as CMS and PIM in one, built with ASP.NET Core 10 Blazor and nothing but Razor Components,
 rendered on the server only (static SSR): no circuit, no WebAssembly, no `blazor.web.js`, no client framework. Every page, product, price, picture and UI text is read live from NovaDB's Delivery API
 (branch `merchDemo`) with a plain `HttpClient`; there is no NovaDB package in between.
