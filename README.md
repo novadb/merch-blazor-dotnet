@@ -34,9 +34,9 @@ with the variables from the environment or `.env` (see `.env.example`).
 
 ## Test
 
-The site passes the shared Playwright behaviour suite of the Nova Merchandising demos: run it from its
-checkout with `BASE_URL=http://localhost:4011 npx playwright test`. The tests tagged `@shopify` (buy button, cart) need
-the Shopify variables.
+The site passes the shared Playwright behaviour suite of the Nova Merchandising demos (not part of this repository, one
+project per demo): run it from its folder with `BASE_URL=http://localhost:4011 npx playwright test --project blazor-dotnet`.
+The tests tagged `@shopify` (buy button, cart) need the Shopify variables.
 
 ## Where things are
 
@@ -47,9 +47,9 @@ the Shopify variables.
 | `NovaDB/Delivery.cs` | Delivery API client on `HttpClient` (Basic auth set in `Program.cs`): paging, 60 s cache |
 | `Site/Regions.cs`, `Site/Labels.cs` | regions (`de`, `uk`, `us`: content language, market, currency) and the UI texts, read from NovaDB's labels |
 | `Site/SiteTree.cs` | page tree, URLs from `merchPageUrlSegment` + parent page, breadcrumb, category page of a group |
-| `Site/Catalog.cs` | products, full-text filter, facets (counted on the server), sorting |
+| `Site/Catalog.cs` | the product and article types, full-text filter, facets (counted on the server), sorting; reading released products with their articles, claims and set rows |
 | `Site/Images.cs`, `Site/Media.cs` | picture URLs by content address; the `/media` proxy with disk cache and scaled WebP variants (SkiaSharp) |
-| `Site/Seo.cs` | canonical and hreflang URLs |
+| `Site/Seo.cs` | canonical and hreflang URLs, a product's meta description and robots |
 | `Program.cs` | services, middleware, `/` → region by `Accept-Language`, `/media/…`, `POST /api/suggest` |
 | `Components/App.razor` | the root component: the router |
 | `Components/Pages/Show.razor` | `/{region}/…`: a page (content + live range) or a product |

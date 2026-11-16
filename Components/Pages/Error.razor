@@ -12,7 +12,7 @@
 <Shell Page="this">
     @if (text is not null)
     {
-        <PageTitle>@text["siteName"]</PageTitle>
+        <PageTitle>@(notFound ? $"{text["notFound"]} · {text["siteName"]}" : text["siteName"])</PageTitle>
     }
     <section class="merchHero not-found">
         <h1 class="merchDisplay">@(notFound ? text!["notFound"] : "Error")</h1>

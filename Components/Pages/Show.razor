@@ -17,6 +17,14 @@
             {
                 <link rel="alternate" hreflang="@hreflang" href="@href" />
             }
+            @if (seo.Description is { } description)
+            {
+                <meta name="description" content="@description" />
+            }
+            @if (seo.Robots is { } robots)
+            {
+                <meta name="robots" content="@robots" />
+            }
             @if (product?.Image is { } hero)
             {
                 @* The product picture is the largest thing above the fold: the browser fetches it before it has laid out the page. *@
@@ -27,16 +35,19 @@
         <Crumbs Items="crumbs" Label='@text["breadcrumb"]' />
         @if (product is { } p)
         {
+            var deliveryDays = p.Articles.Where(a => a.Stock > 0).Select(a => a.DeliveryDays).OfType<int>().ToList();
             var specs = new (string Name, string Value)[]
             {
-                (text["sku"], p.Sku ?? ""),
-                (text["colour"], p.Color is { } color ? text.Value(color) : ""),
+                (text["sku"], string.Join(", ", p.Articles.Select(a => a.Sku).OfType<string>())),
+                (text["colour"], string.Join(", ", p.Colors.Select(text.Value))),
                 (text["material"], string.Join(", ", p.Materials.Select(text.Value))),
                 (text["volume"], p.Volume is { } volume ? $"{volume} ml" : ""),
                 (text["screenSize"], p.ScreenSize is { } inches ? $"{inches}″" : ""),
                 (text["finish"], string.Join(", ", p.Finishes.Select(text.Value))),
                 (text["pieces"], p.Pieces is { } pieces ? text.PieceCount(pieces) : ""),
+                (text["delivery"], deliveryDays.Count > 0 ? deliveryDays.Min().ToString() : ""),
             };
+            var bands = new (string Title, List<Product> Products)[] { (text["similar"], similar), (text["accessories"], accessories), (text["spareParts"], spareParts) };
             <article class="pdp">
                 <div class="pdp__media">
                     @if (p.Image is { } src)
@@ -65,14 +76,34 @@
                             <div><dt>@name</dt><dd>@value</dd></div>
                         }
                     </dl>
+                    @if (contents.Count > 0)
+                    {
+                        <h2 class="pdp__subhead">@text["setContents"]</h2>
+                        <ul class="pdp__list">
+                            @foreach (var row in contents)
+                            {
+                                <li>@row.Quantity × @if (row.Url is { } url) {<a href="@url">@row.Name</a>} else {@row.Name}</li>
+                            }
+                        </ul>
+                    }
+                    @if (p.Claims.Length > 0)
+                    {
+                        <h2 class="pdp__subhead">@text["claims"]</h2>
+                        <ul class="pdp__list">
+                            @foreach (var claim in p.Claims)
+                            {
+                                <li>@claim</li>
+                            }
+                        </ul>
+                    }
                 </div>
             </article>
-            @if (similar.Count > 0)
+            @foreach (var (bandTitle, products) in bands.Where(b => b.Products.Count > 0))
             {
                 <section class="merchBand">
-                    <h2 class="headline">@text["similar"]</h2>
+                    <h2 class="headline">@bandTitle</h2>
                     <div class="grid">
-                        @foreach (var s in similar)
+                        @foreach (var s in products)
                         {
                             <ProductCard Product="s" Ctx="ctx" />
                         }
@@ -111,6 +142,10 @@
     // A product
     Product? product;
     List<Product> similar = [];
+    List<Product> accessories = [];
+    List<Product> spareParts = [];
+    List<SetRow> contents = [];
+    SeoHints? seoHints;
     string? groupName;
 
     protected override async Task OnInitializedAsync()
@@ -132,7 +167,7 @@
             Navigation.NotFound();
             return;
         }
-        seo = Seo.Of(HttpContext.Request, Config, product?.Url ?? page!.Url, Alternates);
+        seo = Seo.Of(HttpContext.Request, Config, product?.Url ?? page!.Url, Alternates, seoHints);
     }
 
     async Task<bool> LoadPageAsync(SitePage page, Dictionary<int, string> groups)
@@ -161,16 +196,18 @@
     async Task<bool> LoadProductAsync(string path, Dictionary<int, string> groups)
     {
         if (path.Length == 0 || await Catalog.ByPathAsync(Region, path) is not { } found) return false;
-        var similarTask = Catalog.ByIdsAsync(found.Similar, Region);
+        var (similarTask, accessoriesTask, sparePartsTask, contentsTask) = (Catalog.ByIdsAsync(found.Similar, Region),
+            Catalog.ByIdsAsync(found.Accessories, Region), Catalog.ByIdsAsync(found.SpareParts, Region), Catalog.SetContentsAsync(found, Region));
         // The same product in the other language: its path is the hreflang link.
         var other = (await Catalog.ByIdsAsync([found.Id], Region.OtherLanguage)).FirstOrDefault();
         var category = found.GroupId is { } group ? Map!.CategoryPage(group) : null;
-        title = found.Name;
+        title = found.Seo.Title ?? found.Name;
+        seoHints = found.Seo;
         Alternates = Region.Alternates(found.Path, other?.Path);
         crumbs = [.. Map!.Breadcrumb(category).Select(ToCrumb), new Target(found.Url, found.Name, null)];
         ctx = new ContentContext(Region, Text!);
         product = found;
-        similar = await similarTask;
+        (similar, accessories, spareParts, contents) = (await similarTask, await accessoriesTask, await sparePartsTask, await contentsTask);
         groupName = found.GroupId is { } id ? groups.GetValueOrDefault(id) : null;
         return true;
     }

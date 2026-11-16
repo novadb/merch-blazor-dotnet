@@ -16,10 +16,10 @@ public sealed class Labels(Delivery delivery, ILogger<Labels> logger)
     /// <summary>UI text key → the product attribute whose name it is.</summary>
     internal static readonly Dictionary<string, string> AttributeText = new()
     {
-        ["group"] = Schema.Product.Group, ["sku"] = Schema.Product.Sku, ["colour"] = Schema.Product.Color,
-        ["material"] = Schema.Product.Materials, ["price"] = Schema.Product.Price, ["availability"] = Schema.Product.InStock,
-        ["volume"] = Schema.Product.CupVolume, ["finish"] = Schema.Product.Finish, ["pieces"] = Schema.Product.Pieces,
-        ["screenSize"] = Schema.Product.ScreenSize,
+        ["group"] = Schema.Product.Group, ["sku"] = Schema.Article.Number, ["colour"] = Schema.Article.Color,
+        ["material"] = Schema.Product.Materials, ["price"] = Schema.Product.Price, ["availability"] = Schema.Article.Stock,
+        ["volume"] = Schema.Product.Volume, ["finish"] = Schema.Product.Finishes, ["pieces"] = Schema.Product.Pieces,
+        ["screenSize"] = Schema.Product.ScreenSize, ["delivery"] = Schema.Article.DeliveryDays,
     };
 
     /// <summary>Labels, attribute names and PIM values of a region's content language (five requests, cached like every Delivery read).</summary>

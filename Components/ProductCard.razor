@@ -1,15 +1,12 @@
 @* Class names and HTML are read outside this file (site.js reuses cards by outerHTML, the test suite selects .product-card__*) and are the same in every demo: change them only together. *@
 @{
     var p = Product;
-    var details = new[]
-    {
-        p.Color is { } color ? Ctx.Text.Value(color) : null,
-        p.Volume is { } volume ? $"{volume} ml" : null,
-        p.ScreenSize is { } inches ? $"{inches}″" : null,
-    }
-    .Concat(p.Materials.Select(Ctx.Text.Value)).Concat(p.Finishes.Select(Ctx.Text.Value))
-    .Append(p.Pieces > 1 ? Ctx.Text.PieceCount(p.Pieces.Value) : null)
-    .OfType<string>();
+    var details = p.Colors.Select(Ctx.Text.Value)
+        .Append(p.Volume is { } volume ? $"{volume} ml" : null)
+        .Append(p.ScreenSize is { } inches ? $"{inches}″" : null)
+        .Concat(p.Materials.Select(Ctx.Text.Value)).Concat(p.Finishes.Select(Ctx.Text.Value))
+        .Append(p.Pieces > 1 ? Ctx.Text.PieceCount(p.Pieces.Value) : null)
+        .OfType<string>();
 }
 <article class="product-card">
     <a href="@p.Url" class="product-card__link">
