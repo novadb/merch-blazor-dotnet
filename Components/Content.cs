@@ -16,6 +16,18 @@ public sealed class Content : ComponentBase
     [Parameter, EditorRequired] public ContentContext Ctx { get; set; } = null!;
     [Parameter] public RenderFragment? AfterFirst { get; set; }
 
+    // The first picture of the document is on screen at once (the hero): lazy loading would delay the largest contentful
+    // paint. Found by reference, as a record compares by value and a picture embedded twice must be eager only once.
+    VNode? firstImage;
+
+    protected override void OnParametersSet() => firstImage = Node is null ? null : FirstImage(Node);
+
+    VNode? FirstImage(VNode node)
+    {
+        if (node is { Type: "image", ObjectId: { } id } && Ctx.Images.ContainsKey(id)) return node;
+        return node.Children?.Select(FirstImage).FirstOrDefault(found => found is not null);
+    }
+
     // A sequence number names a place in this code, not a node: the page is rendered once (static SSR), never diffed.
     protected override void BuildRenderTree(RenderTreeBuilder b)
     {
@@ -56,7 +68,7 @@ public sealed class Content : ComponentBase
                 break;
             case "image":
                 if (node.ObjectId is { } imageId && Ctx.Images.GetValueOrDefault(imageId) is { } src)
-                    Image(b, node.Class, src, sizes);
+                    Image(b, node.Class, src, sizes, eager: ReferenceEquals(node, firstImage));
                 break;
             case "object":
                 // Like the CMS, which wraps what an object component renders in the component's own element: the
@@ -101,7 +113,7 @@ public sealed class Content : ComponentBase
         b.AddAttribute(41, "class", node.Class);
     }
 
-    static void Image(RenderTreeBuilder b, string? cssClass, string src, string sizes)
+    static void Image(RenderTreeBuilder b, string? cssClass, string src, string sizes, bool eager = false)
     {
         b.OpenElement(50, "img");
         b.AddAttribute(51, "class", cssClass);
@@ -109,7 +121,8 @@ public sealed class Content : ComponentBase
         b.AddAttribute(53, "srcset", Images.SrcSet(src));
         b.AddAttribute(54, "sizes", sizes);
         b.AddAttribute(55, "alt", "");
-        b.AddAttribute(56, "loading", "lazy");
+        b.AddAttribute(56, "loading", eager ? "eager" : "lazy");
+        b.AddAttribute(57, "fetchpriority", eager ? "high" : null);
         b.CloseElement();
     }
 }
