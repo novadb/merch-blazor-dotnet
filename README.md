@@ -25,7 +25,7 @@ with the variables from the environment or `.env` (see `.env.example`).
 
 ## Test
 
-The site passes the shared Playwright behaviour suite of the Nova Merchandising demos (Firefox): run it from its
+The site passes the shared Playwright behaviour suite of the Nova Merchandising demos: run it from its
 checkout with `BASE_URL=http://localhost:4011 npx playwright test`. The tests tagged `@shopify` (buy button, cart) need
 the Shopify variables.
 
