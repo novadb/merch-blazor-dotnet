@@ -7,7 +7,8 @@ The same shop in other stacks: React Router ([live](https://react-router.merch.n
 [source](https://github.com/novadb/merch-react-router)) · Razor Pages + htmx
 ([live](https://razor-htmx.merch.novadb.com/), [source](https://github.com/novadb/merch-razor-htmx)) · Nuxt
 ([live](https://vue-nuxt.merch.novadb.com/), [source](https://github.com/novadb/merch-vue-nuxt)) · Astro
-([live](https://astro.merch.novadb.com/), [source](https://github.com/novadb/merch-astro))
+([live](https://astro.merch.novadb.com/), [source](https://github.com/novadb/merch-astro)) ·
+Remix 3 ([live](https://remix.merch.novadb.com/), [source](https://github.com/novadb/merch-remix))
 
 The demo site of NovaDB as CMS and PIM in one, built with ASP.NET Core 10 Blazor and nothing but Razor Components,
 rendered on the server only (static SSR): no circuit, no WebAssembly, no client framework. Every page, product, price,
