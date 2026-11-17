@@ -66,14 +66,6 @@ public sealed class Texts(Dictionary<string, string> texts, Dictionary<int, Name
     /// <summary>The swatch of a colour (by ID), a CSS colour; null if the colour has none.</summary>
     public string? Swatch(int id) => values.GetValueOrDefault(id)?.Hex;
 
-    /// <summary>The strings <c>site.js</c> prints (typeahead headings, the buy button, the cart's visible texts).</summary>
-    public Dictionary<string, string> ForClient() => new()
-    {
-        ["addToCart"] = this["addToCart"], ["cart"] = this["cart"], ["subtotal"] = this["subtotal"], ["checkout"] = this["checkout"],
-        ["cartEmpty"] = this["cartEmpty"], ["cartNotice"] = this["cartNotice"],
-        ["products"] = this["products"], ["pages"] = this["pagesFound"], ["searchAll"] = this["searchAll"],
-    };
-
     string Missing(string key, string where)
     {
         if (Reported.TryAdd($"{region.Code}:{key}", true)) logger.LogError("'{Key}' has no text in {Culture} ({Where})", key, region.Culture, where);

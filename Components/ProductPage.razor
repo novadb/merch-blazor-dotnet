@@ -1,0 +1,92 @@
+@* A product's page: the article with its picture, price, shop button and specs, then the rows of related products. *@
+@inject RegionContext Site
+@{
+    var text = Site.Text;
+    var p = Product;
+    var deliveryDays = p.Articles.Where(a => a.Stock > 0).Select(a => a.DeliveryDays).OfType<int>().ToList();
+    var specs = new (string Name, string Value)[]
+    {
+        (text["sku"], string.Join(", ", p.Articles.Select(a => a.Sku).OfType<string>())),
+        (text["colour"], string.Join(", ", p.Colors.Select(text.Value))),
+        (text["material"], string.Join(", ", p.Materials.Select(text.Value))),
+        (text["volume"], p.Volume is { } volume ? $"{volume} ml" : ""),
+        (text["screenSize"], p.ScreenSize is { } inches ? $"{inches}″" : ""),
+        (text["finish"], string.Join(", ", p.Finishes.Select(text.Value))),
+        (text["pieces"], p.Pieces is { } pieces ? text.PieceCount(pieces) : ""),
+        (text["delivery"], deliveryDays.Count > 0 ? deliveryDays.Min().ToString() : ""),
+    };
+    var bands = new (string Title, List<Product> Products)[] { (text["similar"], Similar), (text["accessories"], Accessories), (text["spareParts"], SpareParts) };
+}
+<article class="pdp">
+    <div class="pdp__media">
+        @if (p.Image is { } src)
+        {
+            <img src="@src" srcset="@Images.SrcSet(src)" sizes="(min-width: 760px) 55vw, 100vw" alt="@p.Name" width="400" height="400" />
+        }
+    </div>
+    <div class="pdp__info">
+        @if (GroupName is not null)
+        {
+            <p class="merchKicker">@GroupName</p>
+        }
+        <h1 class="pdp__name">@p.Name</h1>
+        <p class="pdp__price">@Site.Region.FormatPrice(p.Price)<span class="@(p.InStock == false ? "badge badge--muted" : "badge")">@(p.InStock == false ? text["soldOut"] : text["available"])</span></p>
+        @if (p.ShopifyId is not null && p.InStock != false)
+        {
+            <div class="pdp__buy" data-shopify-product="@p.ShopifyId"></div>
+        }
+        @if (p.DescriptionHtml is { } description)
+        {
+            <div class="pdp__description">@((MarkupString)description)</div>
+        }
+        <dl class="specs">
+            @foreach (var (name, value) in specs.Where(s => s.Value.Length > 0))
+            {
+                <div><dt>@name</dt><dd>@value</dd></div>
+            }
+        </dl>
+        @if (Contents.Count > 0)
+        {
+            <h2 class="pdp__subhead">@text["setContents"]</h2>
+            <ul class="pdp__list">
+                @foreach (var row in Contents)
+                {
+                    <li>@row.Quantity × @if (row.Url is { } url) {<a href="@url">@row.Name</a>} else {@row.Name}</li>
+                }
+            </ul>
+        }
+        @if (p.Claims.Length > 0)
+        {
+            <h2 class="pdp__subhead">@text["claims"]</h2>
+            <ul class="pdp__list">
+                @foreach (var claim in p.Claims)
+                {
+                    <li>@claim</li>
+                }
+            </ul>
+        }
+    </div>
+</article>
+@foreach (var (bandTitle, products) in bands.Where(b => b.Products.Count > 0))
+{
+    <section class="merchBand">
+        <h2 class="headline">@bandTitle</h2>
+        <div class="grid">
+            @foreach (var s in products)
+            {
+                <ProductCard Product="s" />
+            }
+        </div>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public Product Product { get; set; } = null!;
+    /// <summary>The name of the product's group; null if it has none.</summary>
+    [Parameter] public string? GroupName { get; set; }
+    /// <summary>The rows of a set product.</summary>
+    [Parameter] public List<SetRow> Contents { get; set; } = [];
+    [Parameter] public List<Product> Similar { get; set; } = [];
+    [Parameter] public List<Product> Accessories { get; set; } = [];
+    [Parameter] public List<Product> SpareParts { get; set; } = [];
+}

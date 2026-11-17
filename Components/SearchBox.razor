@@ -1,0 +1,22 @@
+@* The search form with its typeahead (an ARIA combobox). The search itself is a plain GET of /{region}/search. While typing,
+   ui.js asks /api/suggest for the list (SuggestionList) and puts it in place of the empty one; its keys are in ui.js too. *@
+@inject RegionContext Site
+@{
+    var text = Site.Text;
+}
+<form class="@(Large ? "search search--large" : "search")" role="search" method="get" action="/@Site.Region.Code/search">
+    <input type="search" name="q" value="@Query" placeholder='@text["searchPlaceholder"]' aria-label='@text["search"]' autocomplete="off"
+           role="combobox" aria-controls="@ListId" aria-autocomplete="list" aria-expanded="false" data-suggest="@ListId" />
+    <ul id="@ListId" class="suggest" role="listbox" hidden></ul>
+    @if (Large)
+    {
+        <button type="submit" class="button">@text["search"]</button>
+    }
+</form>
+
+@code {
+    /// <summary>The typeahead list's ID: the header's and the search page's differ.</summary>
+    [Parameter, EditorRequired] public string ListId { get; set; } = "";
+    [Parameter] public bool Large { get; set; }
+    [Parameter] public string? Query { get; set; }
+}

@@ -1,7 +1,10 @@
-@* A live product range: facet filters as a plain POST form (the URL stays the page's), sorting and the product grid. *@
+@* A live product range: facet filters as a GET form (its fields are the address's query string, which this component reads),
+   sorting and the product grid. Without JavaScript the form submits and the browser shows the answer. With blazor.web.js the
+   form (`data-enhance`) is fetched instead and the page is patched in place: cards that stay keep their element. *@
+@inject RegionContext Site
 @{
-    var (items, facets, selection, defaultSort) = Range;
-    var text = Ctx.Text;
+    var (items, facets, selection, defaultSort) = range;
+    var text = Site.Text;
     var sortLabel = new Dictionary<string, string>
     {
         ["relevance"] = text["sortRelevance"], ["name"] = text["sortName"], ["price-asc"] = text["sortPriceAsc"], ["price-desc"] = text["sortPriceDesc"],
@@ -11,7 +14,7 @@
     var currentSort = selection.Sort ?? defaultSort;
 }
 <section class="range" id="range" aria-label='@text["filter"]'>
-    <form class="facets" id="facets" method="post" action="#range" data-autosubmit="true">
+    <form class="facets" id="facets" method="get" action="#range" data-enhance>
         @if (Query is { Length: > 0 })
         {
             <input type="hidden" name="q" value="@Query" />
@@ -54,7 +57,7 @@
             <div class="grid">
                 @foreach (var p in items.Take(selection.Shown))
                 {
-                    <ProductCard Product="p" Ctx="Ctx" />
+                    <ProductCard Product="p" />
                 }
             </div>
         }
@@ -62,7 +65,7 @@
         {
             <p class="range__empty">@text["noResults"]</p>
         }
-        @* Posts the filters again with one batch more; with JS site.js fetches it while scrolling and appends the new cards. *@
+        @* Submits the filters again with one batch more; ui.js clicks it when it comes near the window. *@
         @if (items.Count > selection.Shown)
         {
             <button type="submit" form="facets" name="shown" value="@(selection.Shown + Catalog.RangeBatch)" class="button button--ghost range__more">@text["showMore"]</button>
@@ -71,10 +74,28 @@
 </section>
 
 @code {
-    [Parameter, EditorRequired] public ProductRange Range { get; set; } = null!;
-    [Parameter, EditorRequired] public ContentContext Ctx { get; set; } = null!;
+    /// <summary>Every product of the range, before any filter: the facets are counted over all of them.</summary>
+    [Parameter, EditorRequired] public List<Product> Products { get; set; } = null!;
+    /// <summary>"relevance" where the order comes from a search, else "name".</summary>
+    [Parameter, EditorRequired] public string DefaultSort { get; set; } = "name";
     /// <summary>Group ID → name, for the group facet.</summary>
     [Parameter, EditorRequired] public IReadOnlyDictionary<int, string> GroupNames { get; set; } = null!;
-    /// <summary>The search query on the search page: the range form posts it again.</summary>
+    /// <summary>The search query on the search page: the range form carries it again.</summary>
     [Parameter] public string? Query { get; set; }
+
+    // The form's fields, from the address. Strings: a number Blazor cannot read would be an error, and the address is anyone's to edit (Catalog.SelectionOf).
+    [SupplyParameterFromQuery(Name = "group")] string[]? GroupValues { get; set; }
+    [SupplyParameterFromQuery(Name = "color")] string[]? Color { get; set; }
+    [SupplyParameterFromQuery(Name = "material")] string[]? Material { get; set; }
+    [SupplyParameterFromQuery(Name = "stock")] string? Stock { get; set; }
+    [SupplyParameterFromQuery(Name = "min")] string? Min { get; set; }
+    [SupplyParameterFromQuery(Name = "max")] string? Max { get; set; }
+    [SupplyParameterFromQuery(Name = "sort")] string? Sort { get; set; }
+    [SupplyParameterFromQuery(Name = "shown")] string? Shown { get; set; }
+    [SupplyParameterFromQuery(Name = "reset")] string? Reset { get; set; }
+
+    ProductRange range = null!;
+
+    protected override void OnParametersSet() =>
+        range = Catalog.ApplySelection(Products, Catalog.SelectionOf(GroupValues, Color, Material, Stock, Min, Max, Sort, Shown, Reset is not null), DefaultSort);
 }

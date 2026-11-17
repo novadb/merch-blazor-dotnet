@@ -1,0 +1,37 @@
+@* The typeahead's list: up to 5 products, then up to 3 pages, then "search all". Hidden and empty until two characters are typed. *@
+@{
+    var n = 0;
+}
+<ul id="@ListId" class="suggest" role="listbox" hidden="@(Query is null)">
+    @if (Query is not null)
+    {
+        @if (Products.Count > 0)
+        {
+            <li class="suggest__heading" role="presentation">@Text["products"]</li>
+        }
+        @foreach (var p in Products)
+        {
+            <li id="@($"{ListId}-{n++}")" class="suggest__option" role="option" data-href="@p.Url">@if (p.Image is { } image) {<img src="@Images.SmallSrc(image)" alt="" width="40" height="40" />}<span class="suggest__name">@p.Name</span><span class="suggest__price">@Region.FormatPrice(p.Price)</span></li>
+        }
+        @if (Pages.Count > 0)
+        {
+            <li class="suggest__heading" role="presentation">@Text["pagesFound"]</li>
+        }
+        @foreach (var found in Pages)
+        {
+            <li id="@($"{ListId}-{n++}")" class="suggest__option" role="option" data-href="@found.Url"><span class="suggest__name">@found.Title</span></li>
+        }
+        <li id="@($"{ListId}-{n}")" class="suggest__option" role="option"><span class="suggest__name suggest__all">@Text["searchAll"] “@Query”</span></li>
+    }
+</ul>
+
+@code {
+    /// <summary>The list's ID: the header's and the search page's lists differ, and the options' IDs start with it.</summary>
+    [Parameter, EditorRequired] public string ListId { get; set; } = "";
+    /// <summary>What was typed (two characters or more); null for the empty list.</summary>
+    [Parameter] public string? Query { get; set; }
+    [Parameter, EditorRequired] public Region Region { get; set; } = null!;
+    [Parameter, EditorRequired] public Texts Text { get; set; } = null!;
+    [Parameter] public List<Product> Products { get; set; } = [];
+    [Parameter] public List<SitePage> Pages { get; set; } = [];
+}

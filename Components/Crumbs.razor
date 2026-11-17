@@ -1,7 +1,8 @@
 @* The breadcrumb of a page or product: the trail from the home page, the last item being the page itself. The home page has none. *@
+@inject RegionContext Site
 @if (Items.Count >= 2)
 {
-    <nav class="crumbs" aria-label="@Label">
+    <nav class="crumbs" aria-label="@Site.Text["breadcrumb"]">
         <ol>
             @for (var i = 0; i < Items.Count; i++)
             {
@@ -21,5 +22,4 @@
 
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<Target> Items { get; set; } = [];
-    [Parameter, EditorRequired] public string Label { get; set; } = "";
 }

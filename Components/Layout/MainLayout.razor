@@ -1,9 +1,12 @@
-@* Document, header and footer, around every page. Not a Blazor layout (@layout): a layout cannot take data from the
-   page it wraps, and this needs the page's region, texts and region-switch targets, so each page wraps itself in it.
-   <title> and the other head links come from the page's <PageTitle> and <HeadContent>, through <HeadOutlet />. *@
+@* Document, header and footer, around every page. The region switch needs the page's counterparts in the other regions, which
+   the page sets on the RegionContext when it has read them: the layout is rendered before that, so it renders again then
+   (`Changed`). <title> and the other head links come from the page's <PageTitle> and <HeadContent>, through <HeadOutlet />. *@
+@inherits LayoutComponentBase
+@implements IDisposable
 @inject IConfiguration Config
+@inject RegionContext Site
 <!DOCTYPE html>
-<html lang="@Page.Region.HtmlLang">
+<html lang="@Site.Region.HtmlLang">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -14,18 +17,24 @@
     @* Assets[…]: the file's fingerprinted name (MapStaticAssets), cached by the browser for good. It is relative (Blazor
        expects a <base href>, which would also move the forms' action="#range"): the "/" makes it absolute. *@
     <link rel="stylesheet" href="/@Assets["site.css"]" />
-    <script src="/@Assets["site.js"]" type="module"></script>
+    <script src="/@Assets["_framework/blazor.web.js"]"></script>
+    <script src="/@Assets["ui.js"]" type="module"></script>
+    <script src="/@Assets["shop.js"]" type="module"></script>
 </head>
-<body data-lang="@Page.Region.Code" data-shop="@(string.IsNullOrEmpty(ShopDomain) || string.IsNullOrEmpty(ShopToken) ? null : "")" data-text="@(Page.Text is null ? null : System.Text.Json.JsonSerializer.Serialize(Page.Text.ForClient()))">
-    <a class="skip" href="#main">@(Page.Text?["skip"] ?? "Skip to content")</a>
-    @if (Page.Text is { } text && Page.Map is { } site)
+@* Enhanced navigation is only for the range's form (`data-enhance`, RangeSection): a link opens its page as a page, so each
+   page starts its own scripts (the Shopify buttons) afresh. *@
+<body data-enhance-nav="false" data-lang="@Site.Region.Code" data-shop="@(string.IsNullOrEmpty(ShopDomain) || string.IsNullOrEmpty(ShopToken) ? null : "")"
+      data-add-to-cart="@Text?["addToCart"]" data-cart="@Text?["cart"]" data-subtotal="@Text?["subtotal"]" data-checkout="@Text?["checkout"]" data-cart-empty="@Text?["cartEmpty"]" data-cart-notice="@Text?["cartNotice"]">
+    <a class="skip" href="#main">@(Text?["skip"] ?? "Skip to content")</a>
+    @if (Text is { } text)
     {
+        var map = Site.Map;
         <header class="site-header">
             <div class="site-header__inner">
-                <a class="logo" href="@site.Home.Url">@site.Home.Title</a>
+                <a class="logo" href="@map.Home.Url">@map.Home.Title</a>
                 <nav class="site-nav" aria-label='@text["mainNav"]'>
                     <ul>
-                        @foreach (var item in site.Home.Children)
+                        @foreach (var item in map.Home.Children)
                         {
                             <li>
                                 <a href="@item.Url">@item.NavTitle</a>
@@ -42,20 +51,18 @@
                         }
                     </ul>
                 </nav>
-                <form class="search" role="search" method="post" action="/@Page.Region.Code/search">
-                    <input type="search" name="q" placeholder='@text["searchPlaceholder"]' aria-label='@text["search"]' autocomplete="off" data-suggest="/api/suggest" />
-                </form>
+                <SearchBox ListId="suggest-1" />
                 <div class="site-header__tools">
                     <nav class="regions" aria-label='@text["region"]'>
                         @foreach (var r in Region.All)
                         {
-                            if (r == Page.Region)
+                            if (r == Site.Region)
                             {
                                 <span class="regions__item" aria-current="true" title="@r.Title">@r.Short</span>
                             }
                             else
                             {
-                                <a class="regions__item" href="@(Page.Alternates.GetValueOrDefault(r) ?? $"/{r.Code}/")" hreflang="@r.HtmlLang" title="@r.Title">@r.Short</a>
+                                <a class="regions__item" href="@(Site.Alternates.GetValueOrDefault(r) ?? $"/{r.Code}/")" hreflang="@r.HtmlLang" title="@r.Title">@r.Short</a>
                             }
                         }
                     </nav>
@@ -63,9 +70,9 @@
             </div>
         </header>
     }
-    <main id="main">@ChildContent</main>
+    <main id="main">@Body</main>
     <footer class="site-footer">
-        @if (Page.Text is { } footerText)
+        @if (Text is { } footerText)
         {
             <p>@footerText.Html("poweredBy")</p>
         }
@@ -80,9 +87,17 @@
     /// <summary>This demo's repository on GitHub (github.com/novadb/…), linked from the footer of every page.</summary>
     const string Repo = "merch-blazor-dotnet";
 
-    [Parameter, EditorRequired] public RegionPage Page { get; set; } = null!;
-    [Parameter] public RenderFragment? ChildContent { get; set; }
-
     string? ShopDomain => Config["SHOPIFY_DOMAIN"];
     string? ShopToken => Config["SHOPIFY_STOREFRONT_TOKEN"];
+    Texts? Text => Site.Loaded ? Site.Text : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Site.Changed += OnChanged;
+        await Site.LoadAsync();
+    }
+
+    void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Site.Changed -= OnChanged;
 }

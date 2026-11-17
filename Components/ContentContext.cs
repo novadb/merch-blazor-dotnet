@@ -13,10 +13,8 @@ public sealed record Target(string Url, string Title, string? Image);
 /// product a link or teaser can point at; <c>Images</c>: the picture URL (<c>/media/{md5}/original{ext}</c>) of each image object
 /// a document node can name. All by object ID.
 /// </summary>
-public sealed partial record ContentContext(Region Region, Texts Text, IReadOnlyDictionary<int, Product> Products, IReadOnlyDictionary<int, Target> Targets, IReadOnlyDictionary<int, string> Images)
+public sealed partial record ContentContext(IReadOnlyDictionary<int, Product> Products, IReadOnlyDictionary<int, Target> Targets, IReadOnlyDictionary<int, string> Images)
 {
-    public ContentContext(Region region, Texts text) : this(region, text, new Dictionary<int, Product>(), new Dictionary<int, Target>(), new Dictionary<int, string>()) { }
-
     /// <summary>Object IDs a document refers to: embedded objects and links inside rich text.</summary>
     public static HashSet<int> ReferencedIds(VNode? node, HashSet<int>? into = null)
     {

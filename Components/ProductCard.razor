@@ -1,11 +1,13 @@
-@* Class names and HTML are read outside this file (site.js reuses cards by outerHTML, the test suite selects .product-card__*) and are the same in every demo: change them only together. *@
+@* Class names and HTML are read outside this file (the test suite selects .product-card__*) and are the same in every demo: change them only together. *@
+@inject RegionContext Site
 @{
     var p = Product;
-    var details = p.Colors.Select(Ctx.Text.Value)
+    var text = Site.Text;
+    var details = p.Colors.Select(text.Value)
         .Append(p.Volume is { } volume ? $"{volume} ml" : null)
         .Append(p.ScreenSize is { } inches ? $"{inches}″" : null)
-        .Concat(p.Materials.Select(Ctx.Text.Value)).Concat(p.Finishes.Select(Ctx.Text.Value))
-        .Append(p.Pieces > 1 ? Ctx.Text.PieceCount(p.Pieces.Value) : null)
+        .Concat(p.Materials.Select(text.Value)).Concat(p.Finishes.Select(text.Value))
+        .Append(p.Pieces > 1 ? text.PieceCount(p.Pieces.Value) : null)
         .OfType<string>();
 }
 <article class="product-card">
@@ -18,11 +20,10 @@
         </div>
         <h3 class="product-card__name">@p.Name</h3>
         <p class="product-card__meta">@string.Join(" · ", details)</p>
-        <p class="product-card__price">@Ctx.Region.FormatPrice(p.Price)@if (p.InStock == false) {<span class="badge badge--muted">@Ctx.Text["soldOut"]</span>}</p>
+        <p class="product-card__price">@Site.Region.FormatPrice(p.Price)@if (p.InStock == false) {<span class="badge badge--muted">@text["soldOut"]</span>}</p>
     </a>
 </article>
 
 @code {
     [Parameter, EditorRequired] public Product Product { get; set; } = null!;
-    [Parameter, EditorRequired] public ContentContext Ctx { get; set; } = null!;
 }

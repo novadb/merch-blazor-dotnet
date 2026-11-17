@@ -2,33 +2,33 @@
 @* The page for a 404 (re-executed by UseStatusCodePagesWithReExecute, also after NavigationManager.NotFound()) and an
    error (UseExceptionHandler), in the region of the URL that failed, else `us`. *@
 @using Microsoft.AspNetCore.Diagnostics
-@inherits RegionPage
+@inject RegionContext Site
 @inject ILogger<Error> Logger
 
 @{
-    var text = Text;
+    var text = Site.Loaded ? Site.Text : null;
     var notFound = isNotFound && text is not null;
 }
-<Shell Page="this">
-    @if (text is not null)
+@if (text is not null)
+{
+    <PageTitle>@(notFound ? $"{text["notFound"]} · {text["siteName"]}" : text["siteName"])</PageTitle>
+}
+<section class="merchHero not-found">
+    <h1 class="merchDisplay">@(notFound ? text!["notFound"] : "Error")</h1>
+    @if (notFound)
     {
-        <PageTitle>@(notFound ? $"{text["notFound"]} · {text["siteName"]}" : text["siteName"])</PageTitle>
+        <p class="merchLead">@text!.Html("notFoundText")</p>
     }
-    <section class="merchHero not-found">
-        <h1 class="merchDisplay">@(notFound ? text!["notFound"] : "Error")</h1>
-        @if (notFound)
-        {
-            <p class="merchLead">@text!.Html("notFoundText")</p>
-        }
-        else
-        {
-            <p class="merchLead">Something went wrong while loading this page.</p>
-        }
-        <p class="merchCta"><a href="@(Map?.Home.Url ?? "/")">@(text?["home"] ?? "Home")</a></p>
-    </section>
-</Shell>
+    else
+    {
+        <p class="merchLead">Something went wrong while loading this page.</p>
+    }
+    <p class="merchCta"><a href="@(Site.Loaded ? Site.Map.Home.Url : "/")">@(text?["home"] ?? "Home")</a></p>
+</section>
 
 @code {
+    /// <summary>The request: a page is rendered once on the server (static SSR), while it is open.</summary>
+    [CascadingParameter] HttpContext HttpContext { get; set; } = null!;
     [Parameter] public int? Code { get; set; }
 
     bool isNotFound;
@@ -41,7 +41,7 @@
         HttpContext.Response.StatusCode = Code ?? StatusCodes.Status500InternalServerError;
         try
         {
-            await LoadRegionAsync(Region.Find(failedPath.Split('/', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()) ?? Region.Us);
+            await Site.LoadAsync(Region.Find(failedPath.Split('/', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()) ?? Region.Us);
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
         {

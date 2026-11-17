@@ -138,25 +138,21 @@ public sealed partial class Catalog(Delivery delivery)
     const int MaxShown = 100_000;
 
     /// <summary>
-    /// The filters and sorting of a posted range form; the form's "reset" button clears them all. Only the "Show more"
-    /// button posts <c>shown</c>, so any other change starts again with the first batch.
+    /// The filters and sorting of a range, from the query parameters the range's form puts in the address; its "reset"
+    /// button clears them all. They arrive as the text they are, not as numbers: the address is anyone's to edit, and a
+    /// value that does not read (a facet value that is no ID, a price that is no number) is dropped, not an error. Only
+    /// the "Show more" button sends <c>shown</c>, so any other change starts again with the first batch.
     /// </summary>
-    public static Selection ParseSelection(IFormCollection posted)
+    public static Selection SelectionOf(string[]? group, string[]? color, string[]? material, string? stock, string? min, string? max, string? sort, string? shown, bool reset)
     {
-        var form = posted.ContainsKey("reset") ? FormCollection.Empty : posted;
-        decimal? Num(string key) => decimal.TryParse(form[key], NumberStyles.Float, CultureInfo.InvariantCulture, out var value) ? value : null;
-        // A posted ID is digits that fit an int: anything else is no ID of ours (the facets and labels treat them as int).
-        int[] Ids(string key) => [.. form[key].Select(v => int.TryParse(v, NumberStyles.None, CultureInfo.InvariantCulture, out var id) ? id : (int?)null).OfType<int>()];
-        var sort = form["sort"].ToString();
-        var shown = int.TryParse(form["shown"], NumberStyles.None, CultureInfo.InvariantCulture, out var n) ? Math.Min(n, MaxShown) : 0;
+        if (reset) return new Selection([], [], [], false, null, null, null, RangeBatch);
+        decimal? Number(string? value) => decimal.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var number) ? number : null;
+        // A facet value is an object ID; anything else is dropped (the views parse every value). The strings stay the checkboxes' values.
+        string[] Ids(string[]? values) => [.. (values ?? []).Where(v => int.TryParse(v, NumberStyles.None, CultureInfo.InvariantCulture, out _))];
         return new Selection(
-            Ids("group"),
-            [.. Ids("color").Select(id => id.ToString())],
-            [.. Ids("material").Select(id => id.ToString())],
-            form["stock"] == "1",
-            Num("min"), Num("max"),
-            Sorts.Contains(sort) ? sort : null,
-            Math.Max(1, (shown + RangeBatch - 1) / RangeBatch) * RangeBatch);
+            [.. Ids(group).Select(int.Parse)], Ids(color), Ids(material), stock == "1", Number(min), Number(max),
+            sort is not null && Sorts.Contains(sort) ? sort : null,
+            (int)Math.Max(1, Math.Ceiling(Math.Clamp(Number(shown) ?? 0, 0, MaxShown) / RangeBatch)) * RangeBatch);
     }
 
     /// <summary>The facet values of a product: group, colour and materials, as the strings their checkboxes post.</summary>

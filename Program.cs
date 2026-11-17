@@ -7,9 +7,10 @@ using System.Text.Unicode;
 using Merch.Components;
 using Merch.NovaDB;
 using Merch.Site;
-using Microsoft.AspNetCore.Components.Endpoints;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Rewrite;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.WebEncoders;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -19,25 +20,35 @@ CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
 // The platform names the port in PORT (as for every demo); ASP.NET Core's own setting is HTTP_PORTS.
 if (builder.Configuration["PORT"] is { Length: > 0 } port) builder.WebHost.UseSetting(WebHostDefaults.HttpPortsKey, port);
 
-// The Delivery login comes from the environment (or `dotnet user-secrets`) and is never logged. Without it the site does not start.
-string Required(string name) => builder.Configuration[name] is { Length: > 0 } value ? value : throw new InvalidOperationException($"{name} is not set (see README, \"Run\")");
-var deliveryUrl = new Uri(Required("NOVA_DELIVERY_URL"));
-var login = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{Required("NOVA_DELIVERY_USER")}:{Required("NOVA_DELIVERY_PASSWORD")}"));
-builder.Services.AddHttpClient(Delivery.HttpClientName, client =>
+// The Delivery login comes from the environment (or `dotnet user-secrets`). Without it the site does not start.
+builder.Services.AddOptions<DeliveryOptions>()
+    .Configure<IConfiguration>((options, config) =>
+    {
+        options.Url = config["NOVA_DELIVERY_URL"];
+        options.User = config["NOVA_DELIVERY_USER"];
+        options.Password = config["NOVA_DELIVERY_PASSWORD"];
+        if (config["DEMO_BRANCH"] is { Length: > 0 } branch) options.Branch = branch;
+    })
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+builder.Services.AddHttpClient(Delivery.HttpClientName, (services, client) =>
 {
-    client.BaseAddress = deliveryUrl;
-    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", login);
+    var login = services.GetRequiredService<IOptions<DeliveryOptions>>().Value;
+    client.BaseAddress = new Uri(login.Url!);
+    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes($"{login.User}:{login.Password}")));
     client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 });
-builder.Services.AddMemoryCache();
+// A Delivery answer is kept as JSON bytes: the default limit of 1 MB would leave the list of all articles uncached.
+builder.Services.AddHybridCache(options => options.MaximumPayloadBytes = 32 * 1024 * 1024);
 builder.Services.AddSingleton<Delivery>();
 builder.Services.AddSingleton<Labels>();
 builder.Services.AddSingleton<SiteTree>();
 builder.Services.AddSingleton<Catalog>();
 builder.Services.AddSingleton<Images>();
 builder.Services.AddSingleton<Media>();
+builder.Services.AddScoped<RegionContext>();
 
-// Razor Components rendered on the server only (static SSR): no circuit, no WebAssembly, no blazor.web.js.
+// Razor Components rendered on the server only (static SSR): no circuit, no WebAssembly. blazor.web.js adds enhanced navigation.
 builder.Services.AddRazorComponents();
 // Umlauts and "·" stay readable in the HTML instead of becoming character references.
 builder.Services.AddWebEncoders(options => options.TextEncoderSettings = new TextEncoderSettings(UnicodeRanges.All));
@@ -61,58 +72,43 @@ app.UseRewriter(new RewriteOptions()
     .AddRedirect($"^((?:{regions})/.+)/$", "$1", StatusCodes.Status301MovedPermanently));
 app.UseExceptionHandler("/error", createScopeForErrors: true);
 app.UseStatusCodePagesWithReExecute("/error/{0}", createScopeForStatusCodePages: true);
-// Blazor takes a POST only for a form it named (a hidden `_handler` field, bound with [SupplyParameterFromForm]) and
-// answers any other with 400. The forms here are the plain HTML forms of every demo, answered with the page itself:
-// a page renders their POST as it renders a GET, and reads the fields from the request (RegionPage.Form).
-app.Use((context, next) =>
-{
-    if (HttpMethods.IsPost(context.Request.Method) && context.GetEndpoint()?.Metadata.GetMetadata<ComponentTypeMetadata>() is not null)
-        context.Request.Method = HttpMethods.Get;
-    return next(context);
-});
+app.UseAntiforgery();
 app.MapStaticAssets();
 
 // `/` → the visitor's region: `/de/` for German browsers, `/uk/` for British English and its neighbours, else `/us/`.
 var ukTags = new Regex(@"^en-(gb|ie|au|nz|za|in|sg)\b");
 app.MapGet("/", (HttpRequest request) =>
 {
-    var preferred = request.Headers.AcceptLanguage.ToString().Split(',')[0].Trim().ToLowerInvariant();
+    var preferred = request.GetTypedHeaders().AcceptLanguage.OrderByDescending(language => language.Quality ?? 1).FirstOrDefault()?.Value.Value?.ToLowerInvariant() ?? "";
     return Results.Redirect(preferred.StartsWith("de") ? "/de/" : ukTags.IsMatch(preferred) ? "/uk/" : "/us/");
 });
 
+// The name keeps the extension because NovaDB serves a file only under it. Neither route can change its content under its name.
+// An SVG stays vector: it has no scaled variant.
+var media = app.MapGroup("/media/{md5}");
 // GET /media/{md5}/original{ext}: the file `files/{md5}{ext}`.
-// GET /media/{md5}/{width}{ext}.webp: the same file scaled to one of the widths as WebP. SVG stays vector: it has no variant.
-// The name keeps the extension because NovaDB serves a file only under it. Neither can change under its name.
-app.MapGet("/media/{md5}/{file}", (string md5, string file, HttpContext context, Media media) =>
+// The constraint keeps `original.png.webp` (an extension with a dot in it) away from this route: it belongs to the next one, as a 404.
+media.MapGet("original.{ext:regex(^[a-z0-9]{{1,5}}$)}", (string md5, string ext, HttpContext context, Media media) =>
+    Media.FileName().IsMatch($"{md5}.{ext}") ? media.ServeOriginalAsync(context, md5, $".{ext}") : Task.FromResult(Results.NotFound()));
+// GET /media/{md5}/{width}{ext}.webp: the same file scaled to one of the widths as WebP.
+media.MapGet("{width}.{ext}.webp", (string md5, string width, string ext, HttpContext context, Media media) =>
 {
-    if (Media.OriginalFile().Match(file) is { Success: true } original)
-        return Media.FileName().IsMatch(md5 + original.Groups["ext"].Value) ? media.ServeOriginalAsync(context, md5, original.Groups["ext"].Value) : Task.FromResult(Results.NotFound());
-
-    if (Media.VariantFile().Match(file) is not { Success: true } variant) return Task.FromResult(Results.NotFound());
-    var ext = variant.Groups["ext"].Value;
-    var width = Media.Widths.FirstOrDefault(w => w.ToString() == variant.Groups["width"].Value); // not int.Parse: it would also read "0400" as 400
-    return width > 0 && ext != ".svg" && Media.FileName().IsMatch(md5 + ext) ? media.ServeScaledAsync(context, md5, ext, width) : Task.FromResult(Results.NotFound());
+    var size = Media.Widths.FirstOrDefault(w => w.ToString() == width); // not int.Parse: it would also read "0400" as 400
+    return size > 0 && ext != "svg" && Media.FileName().IsMatch($"{md5}.{ext}") ? media.ServeScaledAsync(context, md5, $".{ext}", size) : Task.FromResult(Results.NotFound());
 });
 
-// POST /api/suggest with the form fields `lang` and `q` → { products: [...5], pages: [...3] } for the header's typeahead.
-app.MapPost("/api/suggest", async (HttpRequest request, Catalog catalog, SiteTree tree) =>
+// GET /api/suggest?lang=&q=&list=: the header's typeahead list as HTML, a Razor component rendered on its own (up to 5 products and 3 pages).
+// `list` is the ID of the list in the page: the options' IDs start with it.
+app.MapGet("/api/suggest", async Task<IResult> (string? lang, string? q, string? list, Labels labels, Catalog catalog, SiteTree tree) =>
 {
-    if (!request.HasFormContentType) return Results.BadRequest();
-    var form = await request.ReadFormAsync();
-    if (Region.Find(form["lang"]) is not { } region) return Results.NotFound();
-    var q = form["q"].ToString().Trim();
-    if (q.Length < 2 || Catalog.SearchFilter(q, Schema.ProductSearchFields) is not { } filter) return Results.Json(new { products = Array.Empty<object>(), pages = Array.Empty<object>() });
-
-    var products = catalog.LoadAsync(region, filter, "$score", take: 5);
-    var pages = tree.SearchAsync(region, q, 3);
-    return Results.Json(new
-    {
-        products = (await products).Select(p => new { name = p.Name, url = p.Url, image = p.Image is null ? null : Images.SmallSrc(p.Image), price = region.FormatPrice(p.Price) }),
-        pages = (await pages).Select(p => new { title = p.Title, url = p.Url }),
-    });
+    if (Region.Find(lang) is not { } region) return Results.NotFound();
+    var query = (q ?? "").Trim();
+    var filter = query.Length < 2 ? null : Catalog.SearchFilter(query, Schema.ProductSearchFields);
+    var text = labels.LoadAsync(region);
+    var products = filter is null ? Task.FromResult(new List<Product>()) : catalog.LoadAsync(region, filter, "$score", take: 5);
+    var pages = filter is null ? Task.FromResult(new List<SitePage>()) : tree.SearchAsync(region, query, 3);
+    return new RazorComponentResult<SuggestionList>(new { ListId = list ?? "", Query = filter is null ? null : query, Region = region, Text = await text, Products = await products, Pages = await pages });
 });
 
-// The forms only read (filters, sorting, search) and must work from a cached page and from site.js's fetch: no
-// antiforgery token. Blazor asks for one on every POST unless the endpoints say otherwise.
-app.MapRazorComponents<App>().DisableAntiforgery();
+app.MapRazorComponents<App>();
 app.Run();

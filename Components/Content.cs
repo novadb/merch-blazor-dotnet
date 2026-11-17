@@ -78,7 +78,6 @@ public sealed class Content : ComponentBase
                     Open(b, node);
                     b.OpenComponent<ProductCard>(10);
                     b.AddComponentParameter(11, nameof(ProductCard.Product), product);
-                    b.AddComponentParameter(12, nameof(ProductCard.Ctx), Ctx);
                     b.CloseComponent();
                     b.CloseElement();
                 }

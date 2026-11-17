@@ -8,9 +8,13 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <!-- Prices are formatted with the culture of the region (ICU): the full globalization data is needed. -->
     <InvariantGlobalization>false</InvariantGlobalization>
+    <!-- blazor.web.js is a package that .NET 10 adds when the project has a component; the Dockerfile restores before it copies them. -->
+    <RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- One read of the Delivery API per URL while it is cached, however many requests ask at once (Delivery.cs). -->
+    <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" Version="10.11.0" />
     <!-- Scales pictures to WebP (/media/{md5}/{width}{ext}.webp). The Linux build without system dependencies runs in the slim container. -->
     <PackageReference Include="SkiaSharp" Version="4.156.0" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.156.0" />

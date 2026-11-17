@@ -1,131 +1,59 @@
 @page "/{RegionCode}/{*Path}"
-@* /{region}/{path}: a CMS page (with its live product range) or a product from the PIM. The facet and sort forms post
-   to the page itself: the answer is the page, rendered with the posted fields. *@
-@inherits RegionPage
+@* /{region}/{path}: a CMS page (with its live product range) or a product from the PIM. The facet and sort forms are GET
+   forms: the page renders again with their fields in the address, which the range reads (RangeSection). *@
+@inject RegionContext Site
+@inject NavigationManager Navigation
 @inject Catalog Catalog
+@inject SiteTree Tree
 @inject Images Pictures
 @inject IConfiguration Config
 
 @if (seo is not null)
 {
-    var text = Text!;
-    <Shell Page="this">
-        <PageTitle>@title · @text["siteName"]</PageTitle>
-        <HeadContent>
-            <link rel="canonical" href="@seo.Canonical" />
-            @foreach (var (hreflang, href) in seo.Alternates)
-            {
-                <link rel="alternate" hreflang="@hreflang" href="@href" />
-            }
-            @if (seo.Description is { } description)
-            {
-                <meta name="description" content="@description" />
-            }
-            @if (seo.Robots is { } robots)
-            {
-                <meta name="robots" content="@robots" />
-            }
-            @if (product?.Image is { } hero)
-            {
-                @* The product picture is the largest thing above the fold: the browser fetches it before it has laid out the page. *@
-                var srcset = Images.SrcSet(hero); // none for SVG: then the file itself
-                <link rel="preload" as="image" href="@(srcset is null ? hero : null)" imagesrcset="@srcset" imagesizes="@(srcset is null ? null : "(min-width: 760px) 55vw, 100vw")" />
-            }
-        </HeadContent>
-        <Crumbs Items="crumbs" Label='@text["breadcrumb"]' />
-        @if (product is { } p)
+    var text = Site.Text;
+    <PageTitle>@title · @text["siteName"]</PageTitle>
+    <HeadContent>
+        <link rel="canonical" href="@seo.Canonical" />
+        @foreach (var (hreflang, href) in seo.Alternates)
         {
-            var deliveryDays = p.Articles.Where(a => a.Stock > 0).Select(a => a.DeliveryDays).OfType<int>().ToList();
-            var specs = new (string Name, string Value)[]
-            {
-                (text["sku"], string.Join(", ", p.Articles.Select(a => a.Sku).OfType<string>())),
-                (text["colour"], string.Join(", ", p.Colors.Select(text.Value))),
-                (text["material"], string.Join(", ", p.Materials.Select(text.Value))),
-                (text["volume"], p.Volume is { } volume ? $"{volume} ml" : ""),
-                (text["screenSize"], p.ScreenSize is { } inches ? $"{inches}″" : ""),
-                (text["finish"], string.Join(", ", p.Finishes.Select(text.Value))),
-                (text["pieces"], p.Pieces is { } pieces ? text.PieceCount(pieces) : ""),
-                (text["delivery"], deliveryDays.Count > 0 ? deliveryDays.Min().ToString() : ""),
-            };
-            var bands = new (string Title, List<Product> Products)[] { (text["similar"], similar), (text["accessories"], accessories), (text["spareParts"], spareParts) };
-            <article class="pdp">
-                <div class="pdp__media">
-                    @if (p.Image is { } src)
-                    {
-                        <img src="@src" srcset="@Images.SrcSet(src)" sizes="(min-width: 760px) 55vw, 100vw" alt="@p.Name" width="400" height="400" />
-                    }
-                </div>
-                <div class="pdp__info">
-                    @if (groupName is not null)
-                    {
-                        <p class="merchKicker">@groupName</p>
-                    }
-                    <h1 class="pdp__name">@p.Name</h1>
-                    <p class="pdp__price">@Region.FormatPrice(p.Price)<span class="@(p.InStock == false ? "badge badge--muted" : "badge")">@(p.InStock == false ? text["soldOut"] : text["available"])</span></p>
-                    @if (p.ShopifyId is not null && p.InStock != false)
-                    {
-                        <div class="pdp__buy" data-shopify-product="@p.ShopifyId"></div>
-                    }
-                    @if (p.DescriptionHtml is { } description)
-                    {
-                        <div class="pdp__description">@((MarkupString)description)</div>
-                    }
-                    <dl class="specs">
-                        @foreach (var (name, value) in specs.Where(s => s.Value.Length > 0))
-                        {
-                            <div><dt>@name</dt><dd>@value</dd></div>
-                        }
-                    </dl>
-                    @if (contents.Count > 0)
-                    {
-                        <h2 class="pdp__subhead">@text["setContents"]</h2>
-                        <ul class="pdp__list">
-                            @foreach (var row in contents)
-                            {
-                                <li>@row.Quantity × @if (row.Url is { } url) {<a href="@url">@row.Name</a>} else {@row.Name}</li>
-                            }
-                        </ul>
-                    }
-                    @if (p.Claims.Length > 0)
-                    {
-                        <h2 class="pdp__subhead">@text["claims"]</h2>
-                        <ul class="pdp__list">
-                            @foreach (var claim in p.Claims)
-                            {
-                                <li>@claim</li>
-                            }
-                        </ul>
-                    }
-                </div>
-            </article>
-            @foreach (var (bandTitle, products) in bands.Where(b => b.Products.Count > 0))
-            {
-                <section class="merchBand">
-                    <h2 class="headline">@bandTitle</h2>
-                    <div class="grid">
-                        @foreach (var s in products)
-                        {
-                            <ProductCard Product="s" Ctx="ctx" />
-                        }
-                    </div>
-                </section>
-            }
+            <link rel="alternate" hreflang="@hreflang" href="@href" />
         }
-        else
+        @if (seo.Description is { } description)
         {
-            <Content Node="document" Ctx="ctx">
-                <AfterFirst>
-                    @if (range is not null)
-                    {
-                        <RangeSection Range="range" Ctx="ctx" GroupNames="groupNames" />
-                    }
-                </AfterFirst>
-            </Content>
+            <meta name="description" content="@description" />
         }
-    </Shell>
+        @if (seo.Robots is { } robots)
+        {
+            <meta name="robots" content="@robots" />
+        }
+        @if (product?.Image is { } hero)
+        {
+            @* The product picture is the largest thing above the fold: the browser fetches it before it has laid out the page. *@
+            var srcset = Images.SrcSet(hero); // none for SVG: then the file itself
+            <link rel="preload" as="image" href="@(srcset is null ? hero : null)" imagesrcset="@srcset" imagesizes="@(srcset is null ? null : "(min-width: 760px) 55vw, 100vw")" />
+        }
+    </HeadContent>
+    <Crumbs Items="crumbs" />
+    @if (product is { } p)
+    {
+        <ProductPage Product="p" GroupName="@groupName" Contents="contents" Similar="similar" Accessories="accessories" SpareParts="spareParts" />
+    }
+    else
+    {
+        <Content Node="document" Ctx="ctx">
+            <AfterFirst>
+                @if (rangeProducts is not null)
+                {
+                    <RangeSection Products="rangeProducts" DefaultSort="name" GroupNames="groupNames" />
+                }
+            </AfterFirst>
+        </Content>
+    }
 }
 
 @code {
+    /// <summary>The request: a page is rendered once on the server (static SSR), while it is open.</summary>
+    [CascadingParameter] HttpContext HttpContext { get; set; } = null!;
     [Parameter] public string RegionCode { get; set; } = "";
     [Parameter] public string? Path { get; set; }
 
@@ -136,7 +64,7 @@
 
     // A CMS page
     VNode? document;
-    ProductRange? range;
+    List<Product>? rangeProducts;
     Dictionary<int, string> groupNames = [];
 
     // A product
@@ -156,10 +84,10 @@
             Navigation.NotFound();
             return;
         }
-        await LoadRegionAsync(region);
+        await Site.LoadAsync(region);
         var path = (Path ?? "").Trim('/');
         var groups = await Tree.LoadGroupsAsync(region);
-        var found = Map!.ByPath.TryGetValue(path, out var page)
+        var found = Site.Map.ByPath.TryGetValue(path, out var page)
             ? await LoadPageAsync(page, groups)
             : await LoadProductAsync(path, groups);
         if (!found)
@@ -167,45 +95,45 @@
             Navigation.NotFound();
             return;
         }
-        seo = Seo.Of(HttpContext.Request, Config, product?.Url ?? page!.Url, Alternates, seoHints);
+        seo = Seo.Of(HttpContext.Request, Config, product?.Url ?? page!.Url, Site.Alternates, seoHints);
     }
 
     async Task<bool> LoadPageAsync(SitePage page, Dictionary<int, string> groups)
     {
-        var otherMap = Tree.LoadAsync(Region.OtherLanguage); // the page's path in the other language is its hreflang link
-        var embeddedIds = ContentContext.ReferencedIds(page.Content).Where(id => !Map!.Pages.ContainsKey(id)).ToList();
+        var otherMap = Tree.LoadAsync(Site.Region.OtherLanguage); // the page's path in the other language is its hreflang link
+        var embeddedIds = ContentContext.ReferencedIds(page.Content).Where(id => !Site.Map.Pages.ContainsKey(id)).ToList();
         var wantedImages = ContentContext.ImageIds(page.Content); // plus the teaser picture of every page
-        foreach (var p in Map!.Pages.Values) if (p.ImageId is { } id) wantedImages.Add(id);
-        var embedded = Catalog.ByIdsAsync(embeddedIds, Region);
-        var products = page.GroupRefs.Length > 0 ? Catalog.LoadAsync(Region, $"{Schema.Product.Group} = {string.Join(", ", page.GroupRefs)}") : Task.FromResult<List<Product>>([]);
+        foreach (var p in Site.Map.Pages.Values) if (p.ImageId is { } id) wantedImages.Add(id);
+        var embedded = Catalog.ByIdsAsync(embeddedIds, Site.Region);
+        var products = page.GroupRefs.Length > 0 ? Catalog.LoadAsync(Site.Region, $"{Schema.Product.Group} = {string.Join(", ", page.GroupRefs)}") : Task.FromResult<List<Product>>([]);
         var pictures = await Pictures.ByIdsAsync(wantedImages);
 
-        var targets = Map.Pages.Values.ToDictionary(p => p.Id, p => new Target(p.Url, p.Title, p.ImageId is { } id ? pictures.GetValueOrDefault(id) : null));
+        var targets = Site.Map.Pages.Values.ToDictionary(p => p.Id, p => new Target(p.Url, p.Title, p.ImageId is { } id ? pictures.GetValueOrDefault(id) : null));
         var embeddedProducts = await embedded;
         foreach (var p in embeddedProducts) targets[p.Id] = new Target(p.Url, p.Name, p.Image);
         title = page.Title;
-        Alternates = Region.Alternates(page.Path, (await otherMap).Pages.GetValueOrDefault(page.Id)?.Path);
-        crumbs = [.. Map.Breadcrumb(page).Select(ToCrumb)];
+        Site.SetAlternates(Site.Region.Alternates(page.Path, (await otherMap).Pages.GetValueOrDefault(page.Id)?.Path));
+        crumbs = [.. Site.Map.Breadcrumb(page).Select(ToCrumb)];
         document = page.Content;
-        ctx = new ContentContext(Region, Text!, embeddedProducts.ToDictionary(p => p.Id), targets, pictures);
-        if (await products is { Count: > 0 } all) range = Catalog.ApplySelection(all, Catalog.ParseSelection(Form), "name");
+        ctx = new ContentContext(embeddedProducts.ToDictionary(p => p.Id), targets, pictures);
+        if (await products is { Count: > 0 } all) rangeProducts = all;
         groupNames = groups;
         return true;
     }
 
     async Task<bool> LoadProductAsync(string path, Dictionary<int, string> groups)
     {
-        if (path.Length == 0 || await Catalog.ByPathAsync(Region, path) is not { } found) return false;
-        var (similarTask, accessoriesTask, sparePartsTask, contentsTask) = (Catalog.ByIdsAsync(found.Similar, Region),
-            Catalog.ByIdsAsync(found.Accessories, Region), Catalog.ByIdsAsync(found.SpareParts, Region), Catalog.SetContentsAsync(found, Region));
+        if (path.Length == 0 || await Catalog.ByPathAsync(Site.Region, path) is not { } found) return false;
+        var (similarTask, accessoriesTask, sparePartsTask, contentsTask) = (Catalog.ByIdsAsync(found.Similar, Site.Region),
+            Catalog.ByIdsAsync(found.Accessories, Site.Region), Catalog.ByIdsAsync(found.SpareParts, Site.Region), Catalog.SetContentsAsync(found, Site.Region));
         // The same product in the other language: its path is the hreflang link.
-        var other = (await Catalog.ByIdsAsync([found.Id], Region.OtherLanguage)).FirstOrDefault();
-        var category = found.GroupId is { } group ? Map!.CategoryPage(group) : null;
+        var other = (await Catalog.ByIdsAsync([found.Id], Site.Region.OtherLanguage)).FirstOrDefault();
+        var category = found.GroupId is { } group ? Site.Map.CategoryPage(group) : null;
         title = found.Seo.Title ?? found.Name;
         seoHints = found.Seo;
-        Alternates = Region.Alternates(found.Path, other?.Path);
-        crumbs = [.. Map!.Breadcrumb(category).Select(ToCrumb), new Target(found.Url, found.Name, null)];
-        ctx = new ContentContext(Region, Text!);
+        Site.SetAlternates(Site.Region.Alternates(found.Path, other?.Path));
+        crumbs = [.. Site.Map.Breadcrumb(category).Select(ToCrumb), new Target(found.Url, found.Name, null)];
+        
         product = found;
         (similar, accessories, spareParts, contents) = (await similarTask, await accessoriesTask, await sparePartsTask, await contentsTask);
         groupName = found.GroupId is { } id ? groups.GetValueOrDefault(id) : null;
