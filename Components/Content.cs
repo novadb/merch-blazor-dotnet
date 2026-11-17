@@ -36,7 +36,7 @@ public sealed class Content : ComponentBase
             b.AddContent(0, AfterFirst);
             return;
         }
-        // The root node (`visualComponentRoot`) comes from the CMS as `<div class="main">`: the `.main` of site.css.
+        // The root node (`merchComponentRoot`) comes from the CMS as `<div class="main">`: the `.main` of site.css.
         Open(b, Node);
         var children = Node.Children ?? [];
         for (var i = 0; i < children.Count; i++)
